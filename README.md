@@ -18,6 +18,7 @@
   from the console.
   
   Usage:
+
       If <gpu> is ommitted from any command, GPU0 is used. Note that GPU0 only
       refers to the first AMD GPU reported by the amdgpu driver.
 
@@ -30,13 +31,14 @@
       amdpwrman fan <speed> <gpu>    Sets fan speed for <gpu>
       amdpwrman recover <gpu>        Attempt to recover a halted or crashed <gpu>
 
-   GPU0..9 refers to the 0..9th AMD GPUs reported by the amdgpu driver.
+      GPU0..9 refers to the 0..9th AMD GPUs reported by the amdgpu driver.
 
    NOTE: GPU index numbers are in order reported by the amdgpu driver, so GPU0
    will always be the first AMD GPU regardless of what other vendor's adapters
    are present in the system.
 
   Examples:
+
       #$ ./amdpwrman show		Show stats for GPU0 (TODO: show stats for all gpus)
       #$ ./amdpwrman power 100		Sets power limit to 100W for GPU0
       #$ ./amdpwrman power 100 3	Sets power limit to 100W for GPU3
@@ -46,6 +48,7 @@
       #$ ./amdpwrman power reset	Resets the power limit of GPU0
 
   FAQ:
+
 	1q. Why?
 	1a. Why not? I needed an easy way to do this and got sick of manipulating the files by hand, so I whipped up this bash script in a few hours.
 
