@@ -115,7 +115,6 @@ case "$subcommand" in
 
 	pcilinkspeed=`cat /sys/class/drm/card${gpu}/device/current_link_speed`
 	pcilinkwidth=`cat /sys/class/drm/card${gpu}/device/current_link_width`
-	pcidev=`cat /sys/kernel/debug/dri/${gpu}/name`
 
 	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/in0_input`
 
@@ -126,10 +125,14 @@ case "$subcommand" in
 
 	dover
 
-	echo "GPU${gpu}: ${pcidev}"
+	if [ $myuser == "root" ] ; then 
+		pcidev=`cat /sys/kernel/debug/dri/${gpu}/name`
+		echo "GPU${gpu}: ${pcidev}"
+	fi
+
 	echo "GPU${gpu}: PCIe Link Speed is ${pcilinkwidth}x ${pcilinkspeed}"
-	echo "GPU${gpu}: Power limit is ${watts} watts (Min: ${powercapminwatts}w - Max: ${powercapmaxwatts}w)"
 	echo "GPU${gpu}: Temperature is $temperature deg. C ($tempinF deg F)"
+	echo "GPU${gpu}: Power limit is ${watts} watts (Min: ${powercapminwatts}w - Max: ${powercapmaxwatts}w)"
 	echo "GPU${gpu}: Power usage is ${pwrusagewatts} watts ($pwrusagemwfrm mW)"
 	echo -n "GPU${gpu}: Voltage is currently $vddgfx mV ("
 	myvolts=`echo "scale = 2; $vddgfx / 1000" | bc | awk '{printf "%.3f\n", $0}'`
