@@ -117,6 +117,26 @@ case "$subcommand" in
 	pcilinkwidth=`cat /sys/class/drm/card${gpu}/device/current_link_width`
 	pciaddr=`ls /sys/class/drm/card0/device/driver | sort -n | head -1`
 
+	pcideviceid=`cat /sys/class/drm/card${gpu}/device/device`
+	pcivendorid=`cat /sys/class/drm/card${gpu}/device/vendor`
+
+	if [ $pcivendorid == "0x1002" ] ; then 
+		pcivendorname="Advanced Micro Devices, Inc. [AMD/ATI]"
+	elif [ $pcivendorid == "0x10de" ] ; then 
+		pcivendorname="NVIDIA Corporation"
+	elif [ $pcivendorid == "0x8086" ] ; then 
+		pcivendorname="Intel Corporation"
+	else
+		pcivendorname="Unknown"
+	fi
+
+	#TODO: need to add a database of devices
+	if [ $pcideviceid == "0x67df" ] ; then 
+		pcidevicename="Radeon RX570 (4GB)"
+	else
+		pcidevicename="Unknown (Coming Soon)"
+	fi
+
 	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/in0_input`
 
 	# temperature isnt reported with decimals or we would use bc and keep them
@@ -147,6 +167,8 @@ case "$subcommand" in
 	fi
 
 	echo "GPU${gpu}: PCIe Device ${pciaddr} Link Speed is ${pcilinkwidth}x ${pcilinkspeed}"
+	echo "GPU${gpu}: Vendor ID: ${pcivendorid} / ${pcivendorname}"
+	echo "GPU${gpu}: Device ID: ${pcideviceid} / ${pcidevicename}"
 	echo "GPU${gpu}: Current GPU Usage is ${gpuusage}%"
 	echo "GPU${gpu}: VRAM Used: ${mempctused}% used $memusedmb MB (${memused} bytes)"
 	echo "GPU${gpu}: VRAM Total: ${mempctfree}% free $memtotalmb MB (${memtotal} bytes)"
