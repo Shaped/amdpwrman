@@ -3,7 +3,7 @@
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 mycmd="$0 $1 $2 $3 $4"
 myuser=`whoami`
-version="0.01a"
+version="0.02a"
 isnum='^[0-9]+$'
 wait=0.5
 
@@ -115,6 +115,7 @@ case "$subcommand" in
 
 	pcilinkspeed=`cat /sys/class/drm/card${gpu}/device/current_link_speed`
 	pcilinkwidth=`cat /sys/class/drm/card${gpu}/device/current_link_width`
+	pciaddr=`ls /sys/class/drm/card0/device/driver | sort -n | head -1`
 
 	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/in0_input`
 
@@ -123,6 +124,23 @@ case "$subcommand" in
 	temperature=$(expr $temperature / 1000)
 	tempinF=$(echo "scale=2;((9/5) * $temperature) + 32" |bc)
 
+	gpuusage=`cat /sys/class/drm/card${gpu}/device/gpu_busy_percent`
+
+	memused=`cat /sys/class/drm/card${gpu}/device/mem_info_vram_used`
+	memtotal=`cat /sys/class/drm/card${gpu}/device/mem_info_vram_total`
+	memfree=$(expr $memtotal - $memused)
+
+	memusedmb=$(echo "scale=2; $memused / 1048576" | bc | awk '{printf "%.2f\n", $0}')
+	memtotalmb=$(echo "scale=2; $memtotal / 1048576" | bc | awk '{printf "%.2f\n", $0}')
+
+	echo "$memused / $memtotal"
+
+	mempctused=$(echo "scale=4; $memused / $memtotal * 100" | bc | awk '{printf "%.2f\n", $0}')
+	mempctfree=$(echo "scale=4; $memfree / $memtotal * 100" | bc | awk '{printf "%.2f\n", $0}')
+
+	readarray memclocks < /sys/class/drm/card${gpu}/device/pp_dpm_mclk
+	readarray gpuclocks < /sys/class/drm/card${gpu}/device/pp_dpm_sclk
+
 	dover
 
 	if [ $myuser == "root" ] ; then 
@@ -130,8 +148,11 @@ case "$subcommand" in
 		echo "GPU${gpu}: ${pcidev}"
 	fi
 
-	echo "GPU${gpu}: PCIe Link Speed is ${pcilinkwidth}x ${pcilinkspeed}"
-	echo "GPU${gpu}: Temperature is $temperature deg. C ($tempinF deg F)"
+	echo "GPU${gpu}: PCIe Device ${pciaddr} Link Speed is ${pcilinkwidth}x ${pcilinkspeed}"
+	echo "GPU${gpu}: Current GPU Usage is ${gpuusage}%"
+	echo "GPU${gpu}: VRAM Used: ${mempctused}% used $memusedmb MB (${memused} bytes)"
+	echo "GPU${gpu}: VRAM Total: ${mempctfree}% free $memtotalmb MB (${memtotal} bytes)"
+	echo "GPU${gpu}: Temperature is $temperature deg. C ($tempinF deg. F)"
 	echo "GPU${gpu}: Power limit is ${watts} watts (Min: ${powercapminwatts}w - Max: ${powercapmaxwatts}w)"
 	echo "GPU${gpu}: Power usage is ${pwrusagewatts} watts ($pwrusagemwfrm mW)"
 	echo -n "GPU${gpu}: Voltage is currently $vddgfx mV ("
