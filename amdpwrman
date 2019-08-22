@@ -156,6 +156,12 @@ case "$subcommand" in
 			usage
 		exit 1
 		else
+
+			if [ $myuser != "root" ] ; then 
+				echo "Error: root is required to modify values, try: sudo $mycmd"
+				echo ; exit 1
+			fi
+
 			echo -n "Attempting to reset power cap to default .."
 			oldpowercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap`
 			sleep $wait ; echo -n ".."
