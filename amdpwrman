@@ -133,8 +133,6 @@ case "$subcommand" in
 	memusedmb=$(echo "scale=2; $memused / 1048576" | bc | awk '{printf "%.2f\n", $0}')
 	memtotalmb=$(echo "scale=2; $memtotal / 1048576" | bc | awk '{printf "%.2f\n", $0}')
 
-	echo "$memused / $memtotal"
-
 	mempctused=$(echo "scale=4; $memused / $memtotal * 100" | bc | awk '{printf "%.2f\n", $0}')
 	mempctfree=$(echo "scale=4; $memfree / $memtotal * 100" | bc | awk '{printf "%.2f\n", $0}')
 
