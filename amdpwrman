@@ -102,10 +102,10 @@ case "$subcommand" in
 	fanspeedtargetrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_target`
 	fanspeedtargetfrm=`echo $fanspeedtargetrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
 
-	usage=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_average`
-	usagemw=`echo "scale = 2; $usage / 1000" | bc | awk '{printf "%.f\n", $0}'`
-	usagewatts=`echo "scale = 2; $usage / 1000000" | bc | awk '{printf "%.2f\n", $0}'`
-	usagemwfrm=`echo $usagemw | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+	pwrusage=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_average`
+	pwrusagemw=`echo "scale = 2; $pwrusage / 1000" | bc | awk '{printf "%.f\n", $0}'`
+	pwrusagewatts=`echo "scale = 2; $pwrusage / 1000000" | bc | awk '{printf "%.2f\n", $0}'`
+	pwrusagemwfrm=`echo $pwrusagemw | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
 
 	powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_max`
 	powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_min`
@@ -113,18 +113,25 @@ case "$subcommand" in
 	powercapmaxwatts=$(expr $powercapmax / 1000000)
 	powercapminwatts=$(expr $powercapmin / 1000000)
 
+	pcilinkspeed=`cat /sys/class/drm/card${gpu}/device/current_link_speed`
+	pcilinkwidth=`cat /sys/class/drm/card${gpu}/device/current_link_width`
+	pcidev=`cat /sys/kernel/debug/dri/${gpu}/name`
+
 	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/in0_input`
 
 	# temperature isnt reported with decimals or we would use bc and keep them
 	temperature=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/temp1_input`
 	temperature=$(expr $temperature / 1000)
+	tempinF=$(echo "scale=2;((9/5) * $temperature) + 32" |bc)
 
 	dover
 
+	echo "GPU${gpu}: ${pcidev}"
+	echo "GPU${gpu}: PCIe Link Speed is ${pcilinkwidth}x ${pcilinkspeed}"
 	echo "GPU${gpu}: Power limit is ${watts} watts (Min: ${powercapminwatts}w - Max: ${powercapmaxwatts}w)"
-	echo "GPU${gpu}: Temperature is $temperature deg. C"
-	echo "GPU${gpu}: Power usage is ${usagewatts} watts ($usagemwfrm mW)"
-	echo -n "GPU${gpu}: voltage is currently $vddgfx mV ("
+	echo "GPU${gpu}: Temperature is $temperature deg. C ($tempinF deg F)"
+	echo "GPU${gpu}: Power usage is ${pwrusagewatts} watts ($pwrusagemwfrm mW)"
+	echo -n "GPU${gpu}: Voltage is currently $vddgfx mV ("
 	myvolts=`echo "scale = 2; $vddgfx / 1000" | bc | awk '{printf "%.3f\n", $0}'`
 	echo "$myvolts V)"
 	echo "GPU${gpu}: Fan speed for is ${fanspeedpct}% ($fanspeedrpmfrm RPM, Min: $fanspeedminrpmfrm RPM - Max: $fanspeedmaxrpmfrm RPM)"
