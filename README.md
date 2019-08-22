@@ -65,6 +65,7 @@
 	5a. Yep. This is a quick hacky shell script that I spent more time on than I planned and figured it might be worth sharing. Do whatever the fack you want with it, just maybe at least refer to me as the original author though.
 
   TODO:
+
       - support multiple GPUs at once, eg. 'amdpwrman show all'.
       - change 'show' without a GPU specifier to show all GPUs once multigpu support is complete.
       
