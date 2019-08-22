@@ -1,0 +1,408 @@
+#!/bin/bash
+
+me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+mycmd="$0 $1 $2 $3 $4"
+myuser=`whoami`
+version="0.01a"
+isnum='^[0-9]+$'
+wait=0.5
+
+dover () {
+  echo "$me $version        (C) 2020 Jai B. (Shaped Technologies)        MIT License"
+  echo
+}
+
+usage () {
+  dover
+
+  echo "$me shows statistics and manipulates power limit settings for AMD GPUs"
+  echo "on Linux through the sysfs interface provided by the amdgpu driver. This script"
+  echo "was designed to be very simple to use from the shell, requiring no external"
+  echo "configuration."
+  echo
+  echo "All values are reported by the sysfs interface provided by the amdgpu driver,"
+  echo "sometimes these values may not be \"perfect\", for example on an RX570, the max"
+  echo "RPM of the fan is reported as 5300 RPM but at 100% fan speed the fan only hits"
+  echo "3300 RPM. I've also noticed this behavior with apps on Windows even, so it is"
+  echo "not isolated to Linux, nor is it an issue with this script."
+  echo
+  echo "Note: $me will require root access to modify values."
+  echo "Attempting to recover a GPU may require the amdgpu.gpu_recovery=1 kernel flag."
+  echo
+  echo "Usage:"
+  echo "   If <gpu> is ommitted from any command, GPU0 is used."
+#TODO
+#  echo "   <gpu> can also be 'all' for all gpus for all commands, except recover"
+  echo
+  echo "   $me help | -h            Display this help message."
+  echo "   $me show <gpu>           Shows detailed statistics for <gpu>"
+  echo "   $me power <limit> <gpu>  Sets power limit to <limit> in watts for <gpu>"
+  echo "   $me power reset <gpu>    Resets power limit for <gpu>"
+  echo "   $me fan enable <gpu>     Enables manual fan speed control for <gpu>"
+  echo "   $me fan disable <gpu>    Disables manual fan speed control for <gpu>"
+  echo "   $me fan <speed> <gpu>    Sets fan speed for <gpu>"
+  echo "   $me recover <gpu>        Attempt to recover a halted or crashed <gpu>"
+  echo
+  echo "   GPU0..9 refers to the 0..9th AMD GPUs reported by the amdgpu driver."
+  echo
+}
+
+if [[ $# -eq 0 ]] ; then
+  usage
+  exit 0
+fi
+
+# Parse options
+while getopts ":h" opt; do
+  case ${opt} in
+    h )
+	usage
+	exit 0
+    ;;
+    \? )
+	echo "Invalid option: -$OPTARG" 1>&2
+    ;;
+  esac
+done
+shift $((OPTIND -1))
+
+subcommand=$1; shift
+
+#    shift $((OPTIND -1))
+case "$subcommand" in
+  help) 
+	usage
+	exit 0
+  ;;
+  show)
+	gpu=$2;
+	if [ -z $gpu ] || ! [[ "$gpu" =~ $isnum ]] ; then
+		gpu=0
+	fi
+
+	if [ ! -d /sys/class/drm/card${gpu} ] ; then
+		echo "Error: Unable to find GPU${gpu}"
+		echo ; exit 1
+	fi
+
+	powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap`
+	watts=$(expr $powercap / 1000000)
+
+	fanspeedmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+	fanspeedpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1`
+	fanspeedpct=$(expr $fanspeedpwm / 255 \* 100)
+
+	fanspeedrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_input`
+	fanspeedrpmfrm=`echo $fanspeedrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+	fanspeedmaxrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_max`
+	fanspeedmaxrpmfrm=`echo $fanspeedmaxrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+	fanspeedminrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_min`
+	fanspeedminrpmfrm=`echo $fanspeedminrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+	fanspeedtargetrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_target`
+	fanspeedtargetfrm=`echo $fanspeedtargetrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+
+	usage=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_average`
+	usagemw=`echo "scale = 2; $usage / 1000" | bc | awk '{printf "%.f\n", $0}'`
+	usagewatts=`echo "scale = 2; $usage / 1000000" | bc | awk '{printf "%.2f\n", $0}'`
+	usagemwfrm=`echo $usagemw | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+
+	powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_max`
+	powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_min`
+
+	powercapmaxwatts=$(expr $powercapmax / 1000000)
+	powercapminwatts=$(expr $powercapmin / 1000000)
+
+	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/in0_input`
+
+	# temperature isnt reported with decimals or we would use bc and keep them
+	temperature=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/temp1_input`
+	temperature=$(expr $temperature / 1000)
+
+	dover
+
+	echo "GPU${gpu}: Power limit is ${watts} watts (Min: ${powercapminwatts}w - Max: ${powercapmaxwatts}w)"
+	echo "GPU${gpu}: Temperature is $temperature deg. C"
+	echo "GPU${gpu}: Power usage is ${usagewatts} watts ($usagemwfrm mW)"
+	echo -n "GPU${gpu}: voltage is currently $vddgfx mV ("
+	myvolts=`echo "scale = 2; $vddgfx / 1000" | bc | awk '{printf "%.3f\n", $0}'`
+	echo "$myvolts V)"
+	echo "GPU${gpu}: Fan speed for is ${fanspeedpct}% ($fanspeedrpmfrm RPM, Min: $fanspeedminrpmfrm RPM - Max: $fanspeedmaxrpmfrm RPM)"
+	echo -n "GPU${gpu}: Fan control is set to "
+
+	if [ $fanspeedmode == "1" ] ; then
+		echo "manual"
+	elif [ $fanspeedmode == "2" ] ; then
+		echo "automatic with a target of $fanspeedtargetfrm RPM"
+	else
+		echo "unknown"
+	fi
+      echo ; exit 0
+    ;;
+    power )
+	gpu=$2
+	if [ -z $gpu ] || ! [[ "$gpu" =~ $isnum ]] ; then
+		gpu=0
+	fi
+
+	if [ ! -d /sys/class/drm/card${gpu} ] ; then
+		echo "Error: Unable to find GPU${gpu}"
+		echo ; exit 1
+	fi
+
+	if [ -z $1 ] || ! [[ "$1" =~ $isnum ]]  ; then 
+		if [ $1 != 'reset' ] ; then 
+			echo "Error: You must specify a power limit in watts"
+			usage
+		exit 1
+		else
+			echo -n "Attempting to reset power cap to default .."
+			oldpowercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap`
+			sleep $wait ; echo -n ".."
+			echo 0 > /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap
+			sleep $wait ; echo -n ".."
+			powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap`
+			sleep $wait ; echo -n ".."
+
+			oldpowercapwatts=$(expr $oldpowercap / 1000000)
+			powercapwatts=$(expr $powercap / 1000000)
+
+			if [ $powercap -ne $oldpowercap ] ; then
+				echo ".. Power cap changed"
+				echo "Previous Power Cap: $oldpowercapwatts watts"
+				echo "New Power Cap: $powercapwatts watts (set by driver)"
+				echo ; exit 0
+			else
+				echo ".. Power cap was not changed"
+				echo "The default power cap may be the same as the previous power cap."
+				echo "Previous Power Cap: $oldpowercapwatts watts"
+				echo "New Power Cap: $powercapwatts watts"
+				echo ; exit 1
+			fi
+		fi
+	fi
+
+	oldpowercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap`
+	powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_max`
+	powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_min`
+
+	oldpowercapwatts=$(expr $oldpowercap / 1000000)
+	powercapmaxwatts=$(expr $powercapmax / 1000000)
+	powercapminwatts=$(expr $powercapmin / 1000000)
+
+	newpowercap=$(expr $1 \* 1000000)
+
+	if (( $newpowercap > $powercapmax || $newpowercap < $powercapmin || $newpowercap == 0)) ; then 
+		echo "Error: The power cap you have requested ($1 watts) is outside the range of GPU${gpu}"
+		echo "GPU${gpu} specifies that it accepts power caps from $powercapminwatts watts to $powercapmaxwatts watts"
+		echo "You also cannot specify a power cap of 0 watts"
+		echo ; exit 1
+	fi
+
+	if [ $newpowercap -eq $oldpowercap ] ; then 
+		echo "GPU${gpu} is already set to ${1} watts"
+		echo ; exit 1
+	fi
+
+	if [ $myuser != "root" ] ; then 
+		echo "Error: root is required to modify values, try: sudo $mycmd"
+		echo ; exit 1
+	fi
+
+	echo "Setting power cap for GPU${gpu} to ${1} watts"
+
+	echo $newpowercap > /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap
+
+	sleep $wait
+
+	echo -n "Checking if applied successfully .."
+
+	sleep $wait
+
+	echo -n ".."
+
+	powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap`
+	powercapwatts=$(expr $powercap / 1000000)
+
+	if [ $newpowercap -ne $powercap ] ; then 
+		echo ".. FAILED"
+		echo "$me was not able to apply the requested power settings"
+		if [ $powercap -ne $oldpowercap ] ; then
+			echo "The power cap was still changed, your request may have been out of range."
+			echo "The old power cap reported by the driver was $oldpowercapwatts"
+			echo "The new power cap reported by the driver is $powercapwatts"
+		fi
+		echo ; exit 1
+	else
+		if [ $powercap -eq $oldpowercap ] ; then 
+			echo ".. NO CHANGE"
+		else
+			echo ".. OK"
+		fi
+		echo ; exit 0
+	fi
+
+    ;;
+    fan )
+	gpu=$2
+	if [ -z $gpu ] ; then
+		gpu=0
+	fi
+
+	cmd=$1
+	if [ -z $1 ] || (( $1 < 0  || $1 > 100 )) || ! [[ "$1" =~ $isnum ]] ; then 
+	    if [ "$cmd" != "enable" ] && [ "$cmd" != "disable" ] ; then 
+		echo "Error: You must specify a fan speed in percent (0 - 100)"
+		usage
+		exit 1
+	    fi
+	fi
+
+	if [ ! -d /sys/class/drm/card${gpu} ] ; then
+		echo "Error: Unable to find GPU${gpu}"
+		echo ; exit 1
+	fi
+
+	if [ $myuser != "root" ] ; then 
+		echo "Error: root is required to modify values, try: sudo $mycmd"
+		echo ; exit 1
+	fi
+
+	if [ $1 == 'enable' ] ; then 
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+		if (( $fanmode == 1 )) ; then 
+			echo "Error: Manual control is already enabled."
+			echo ; exit 1
+		fi
+
+		echo -n  "Enabling manual fan speed control for GPU${gpu} .."
+
+		sleep $wait
+
+		echo 1 > /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable
+
+		sleep $wait
+
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+		if (( $fanmode == 1 )) ; then 
+			echo ".. OK"
+			echo ; exit 0
+		else
+			echo ".. FAILED"
+			echo ; exit 1
+		fi
+	fi
+
+	if [ $1 == 'disable' ] ; then 
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+		if (( $fanmode == 2 )) ; then 
+			echo "Error: Manual control is already disabled."
+			echo ; exit 1
+		fi
+
+		echo -n  "Disabling manual fan speed control for GPU${gpu} .."
+		sleep $wait
+
+		echo 2 > /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable
+
+		sleep $wait
+
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+		if (( $fanmode == 2 )) ; then 
+			echo ".. OK"
+			echo ; exit 0
+		else
+			echo ".. FAILED"
+			echo ; exit 1
+		fi
+	fi
+
+	fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+	if (( $fanmode != 1 )) ; then 
+		echo "Error: Fan mode is not set to manual."
+		echo "You can use $me fan enable <gpu> to enable fan control."
+		echo ; exit 1
+	else
+		newpwm=$(expr $1 \* 255 / 100)
+		oldpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1`
+
+		oldpwmpct=$(expr $oldpwm \* 100 / 255)
+
+		echo "Current fan speed: ${oldpwmpct}% (${oldpwm} / 255)"
+
+		echo -n "Attempting to set fan speed for GPU${gpu} to ${1}% (${newpwm} / 255) .."
+
+		sleep $wait
+
+		echo -n ".."
+		echo $newpwm > /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1
+
+		sleep $wait
+
+		pwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1`
+
+		if (( $pwm != $oldpwm )) ; then 
+			echo ".. FAN SPEED CHANGED"
+			newpwmpct=$(expr $pwm \* 100 / 255)
+			echo "Requested Speed: ${1}% ($newpwm / 255)"
+			echo "New speed: ${newpwmpct}% (${pwm} / 255)"
+			echo ; exit 0
+		else
+			echo ".. FAN SPEED NOT CHANGED"
+			echo ; exit 1
+		fi
+
+
+	fi
+
+    ;;
+    recover )
+	gpu=$2
+	if [ -z $gpu ] ; then
+		gpu=0
+	fi
+
+	if [ ! -d /sys/class/drm/card${gpu} ] ; then
+		echo "Error: Unable to find GPU${gpu}"
+		echo ; exit 1
+	fi
+
+	if [ $myuser != "root" ] ; then 
+		echo "Error: root is required to recover GPU, try: sudo $mycmd"
+		echo ; exit 1
+	fi
+
+	echo -n "Attempting to recover GPU${gpu} .."
+
+	sleep $wait
+
+	result=`cat /sys/kernel/debug/dri/${gpu}/amdgpu_gpu_recover`
+
+	sleep $wait
+	sleep $wait
+
+	# can we find a better way to check that the GPU has been recovered?
+	# is there a way to force a hang for testing?
+	if [ ! -d /sys/kernel/debug/dri/0 ] || [[ $result != "gpu recover" ]] ; then
+		echo ".. FAILED"
+		echo "Error: Could not find GPU${gpu} interface after recovery."
+		echo ; exit 1
+	else
+		echo ".. SUCCESS"
+		echo "Note: A reboot may still be needed to fully recover GPU${gpu}."
+		echo ; exit 0
+	fi
+    ;;
+    * )
+	if [ ! -z $subcommand ] ; then
+	  echo "Invalid command '$subcommand'"
+	  usage
+	fi
+	exit 1
+    ;;
+esac
