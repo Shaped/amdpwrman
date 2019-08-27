@@ -3,7 +3,7 @@
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 mycmd="$0 $1 $2 $3 $4"
 myuser=`whoami`
-version="0.02a"
+version="0.03a"
 isnum='^[0-9]+$'
 wait=0.5
 
@@ -115,10 +115,15 @@ case "$subcommand" in
 
 	pcilinkspeed=`cat /sys/class/drm/card${gpu}/device/current_link_speed`
 	pcilinkwidth=`cat /sys/class/drm/card${gpu}/device/current_link_width`
+	maxpcilinkspeed=`cat /sys/class/drm/card${gpu}/device/max_link_speed`
+	maxpcilinkwidth=`cat /sys/class/drm/card${gpu}/device/max_link_width`
 	pciaddr=`ls /sys/class/drm/card0/device/driver | sort -n | head -1`
 
 	pcideviceid=`cat /sys/class/drm/card${gpu}/device/device`
 	pcivendorid=`cat /sys/class/drm/card${gpu}/device/vendor`
+
+	pcisubdeviceid=`cat /sys/class/drm/card${gpu}/device/subsystem_vendor`
+	pcisubvendorid=`cat /sys/class/drm/card${gpu}/device/subsystem_device`
 
 	if [ $pcivendorid == "0x1002" ] ; then 
 		pcivendorname="Advanced Micro Devices, Inc. [AMD/ATI]"
@@ -137,6 +142,19 @@ case "$subcommand" in
 		pcidevicename="Unknown (Coming Soon)"
 	fi
 
+	#TODO: database of individual cards too? users would have to submit? 2*complicated?
+	if [ $pcisubdeviceid == "0x341a" ] ; then 
+		pcisubdevicename="RX470 Armor (4GB)"
+	else
+		pcisubdevicename="Unknown (Coming Soon)"
+	fi
+
+	if [ $pcisubvendorid == "0x1462" ] ; then 
+		pcisubvendorname="Micro-Star International Co., Ltd. [MSI]"
+	else
+		pcisubvendorname="Unknown (Coming Soon)"
+	fi
+
 	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/in0_input`
 
 	# temperature isnt reported with decimals or we would use bc and keep them
@@ -145,6 +163,27 @@ case "$subcommand" in
 	tempinF=$(echo "scale=2;((9/5) * $temperature) + 32" |bc)
 
 	gpuusage=`cat /sys/class/drm/card${gpu}/device/gpu_busy_percent`
+	vramusage=`cat /sys/class/drm/card${gpu}/device/mem_busy_percent`
+
+	freq1=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/freq1_input`
+	freq1mhz=$(echo "scale=2; $freq1 / 1000000" | bc | awk '{printf "%.2f\n", $0}')
+	freq1name=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/freq1_label`
+
+	freq2=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/freq2_input`
+	freq2mhz=$(echo "scale=2; $freq2 / 1000000" | bc | awk '{printf "%.2f\n", $0}')
+	freq2name=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/freq2_label`
+
+	if [ $freq1name == "sclk" ] ; then 
+		freq1friendlyname="GPU clock"
+	else
+		freq1friendlyname="Unknown clock (usually GPU)"
+	fi
+
+	if [ $freq2name == "mclk" ] ; then 
+		freq2friendlyname="Memory clock"
+	else
+		freq2friendlyname="Unknown clock (usually memory)"
+	fi
 
 	memused=`cat /sys/class/drm/card${gpu}/device/mem_info_vram_used`
 	memtotal=`cat /sys/class/drm/card${gpu}/device/mem_info_vram_total`
@@ -159,6 +198,49 @@ case "$subcommand" in
 	readarray memclocks < /sys/class/drm/card${gpu}/device/pp_dpm_mclk
 	readarray gpuclocks < /sys/class/drm/card${gpu}/device/pp_dpm_sclk
 
+	availmemclks=""
+
+	for i in "${!memclocks[@]}"; do
+	    memclocks[i]=`echo "${memclocks[i]}"` #strip newlines
+	    IFS=' ' read -r -a memclk <<< ${memclocks[i]}
+		for x in "${!memclk[@]}"; do
+			IFS=':' read -r -a split <<< ${memclk[x]}
+			memclk[x]=${split[0]}
+			if (( x == 1 )) ; then 
+				availmemclks=`echo $availmemclks ${memclk[x]}`
+				memclks[i]=${memclk[x]}
+			fi
+			if (( x == 2 )) ; then
+				availmemclks=`echo ${availmemclks}*`
+				curmemclk=$i;
+			fi
+		done
+	done
+
+
+#	for c in "${!memclks[@]}"; do
+#		echo "memclks $c: ${memclks[c]}"
+#	done
+
+	for i in "${!gpuclocks[@]}"; do
+	    gpuclocks[i]=`echo "${gpuclocks[i]}"` #strip newlines
+	    IFS=' ' read -r -a gpuclk <<< ${gpuclocks[i]}
+		for x in "${!gpuclk[@]}"; do
+			IFS=':' read -r -a split <<< ${gpuclk[x]}
+			gpuclk[x]=${split[0]}
+			if (( x == 1 )) ; then 
+				availgpuclks=`echo $availgpuclks ${gpuclk[x]}`
+				gpuclks[i]=${gpuclk[x]}
+			fi
+			if (( x == 2 )) ; then
+				availgpuclks=`echo ${availgpuclks}*`
+				curgpuclk=$i;
+			fi
+		done
+	done
+
+#	echo "curgpuclk: $curgpuclk ${gpuclks[curgpuclk]}"
+
 	dover
 
 	if [ $myuser == "root" ] ; then 
@@ -169,7 +251,16 @@ case "$subcommand" in
 	echo "GPU${gpu}: PCIe Device ${pciaddr} Link Speed is ${pcilinkwidth}x ${pcilinkspeed}"
 	echo "GPU${gpu}: Vendor ID: ${pcivendorid} / ${pcivendorname}"
 	echo "GPU${gpu}: Device ID: ${pcideviceid} / ${pcidevicename}"
-	echo "GPU${gpu}: Current GPU Usage is ${gpuusage}%"
+	echo "GPU${gpu}: Sub-Vendor ID: ${pcisubvendorid} / ${pcisubvendorname}"
+	echo "GPU${gpu}: Sub-Device ID: ${pcisubdeviceid} / ${pcisubdevicename}"
+	echo "GPU${gpu}: Current GPU Usage is ${gpuusage}% (gpu_busy)"
+	echo "GPU${gpu}: Current ${freq1friendlyname} speed is ${freq1mhz} mHz ($freq1name - freq1)"
+	echo "GPU${gpu}: Current ${freq2friendlyname} speed is ${freq2mhz} mHz ($freq2name - freq2)"
+	echo "GPU${gpu}: Power Profile GPU Clocks: $availgpuclks"
+	echo "GPU${gpu}: Power Profile Mem Clocks: $availmemclks"
+	echo "GPU${gpu}: Current GPU Power Profile: $curgpuclk @ ${gpuclks[curgpuclk]} mHz (${freq1mhz} mHz actual)"
+	echo "GPU${gpu}: Current Mem Power Profile: $curmemclk @ ${memclks[curmemclk]} mHz (${freq2mhz} mHz actual)"
+	echo "GPU${gpu}: Current VRAM Activity is ${vramusage}% (mem_busy)"
 	echo "GPU${gpu}: VRAM Used: ${mempctused}% used $memusedmb MB (${memused} bytes)"
 	echo "GPU${gpu}: VRAM Total: ${mempctfree}% free $memtotalmb MB (${memtotal} bytes)"
 	echo "GPU${gpu}: Temperature is $temperature deg. C ($tempinF deg. F)"
