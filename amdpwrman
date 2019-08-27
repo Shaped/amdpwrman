@@ -122,8 +122,8 @@ case "$subcommand" in
 	pcideviceid=`cat /sys/class/drm/card${gpu}/device/device`
 	pcivendorid=`cat /sys/class/drm/card${gpu}/device/vendor`
 
-	pcisubdeviceid=`cat /sys/class/drm/card${gpu}/device/subsystem_vendor`
-	pcisubvendorid=`cat /sys/class/drm/card${gpu}/device/subsystem_device`
+	pcisubvendorid=`cat /sys/class/drm/card${gpu}/device/subsystem_vendor`
+	pcisubdeviceid=`cat /sys/class/drm/card${gpu}/device/subsystem_device`
 
 	if [ $pcivendorid == "0x1002" ] ; then 
 		pcivendorname="Advanced Micro Devices, Inc. [AMD/ATI]"
