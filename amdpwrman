@@ -248,7 +248,7 @@ case "$subcommand" in
 		echo "GPU${gpu}: ${pcidev}"
 	fi
 
-	echo "GPU${gpu}: PCIe Device ${pciaddr} Link Speed is ${pcilinkwidth}x ${pcilinkspeed}"
+	echo "GPU${gpu}: PCIe Device ${pciaddr} Link Speed is ${pcilinkwidth}x ${pcilinkspeed} (GPU Max: ${maxpcilinkwidth}x ${maxpcilinkspeed})"
 	echo "GPU${gpu}: Vendor ID: ${pcivendorid} / ${pcivendorname}"
 	echo "GPU${gpu}: Device ID: ${pcideviceid} / ${pcidevicename}"
 	echo "GPU${gpu}: Sub-Vendor ID: ${pcisubvendorid} / ${pcisubvendorname}"
