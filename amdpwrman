@@ -1,4 +1,6 @@
 #!/bin/bash
+#amdpwrman (C) 2020 Jai B. Shaped Technologies (MIT License)
+#script for managing amdgpus through sysfs interface of amdgpu driver
 
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 mycmd="$0 $1 $2 $3 $4"
@@ -6,6 +8,22 @@ myuser=`whoami`
 version="0.03a"
 isnum='^[0-9]+$'
 wait=0.5
+longwait=5
+fanwait=5
+parent=$(ps -o comm= $PPID)
+
+checkbashver () {
+    IFS='.' read -r -a bashvers <<< $BASH_VERSION
+    if ! (( bashvers[0] >= 4 )) ; then
+	echo "BASH 4+ is required."
+	echo ; exit 1
+    fi
+}
+
+log () {
+	now=`date +"%D %T"`
+	echo "[${now}] $1"
+}
 
 dover () {
   echo "$me $version        (C) 2020 Jai B. (Shaped Technologies)        MIT License"
@@ -34,18 +52,42 @@ usage () {
 #TODO
 #  echo "   <gpu> can also be 'all' for all gpus for all commands, except recover"
   echo
-  echo "   $me help | -h            Display this help message."
-  echo "   $me show <gpu>           Shows detailed statistics for <gpu>"
-  echo "   $me power <limit> <gpu>  Sets power limit to <limit> in watts for <gpu>"
-  echo "   $me power reset <gpu>    Resets power limit for <gpu>"
-  echo "   $me fan enable <gpu>     Enables manual fan speed control for <gpu>"
-  echo "   $me fan disable <gpu>    Disables manual fan speed control for <gpu>"
-  echo "   $me fan <speed> <gpu>    Sets fan speed for <gpu>"
-  echo "   $me recover <gpu>        Attempt to recover a halted or crashed <gpu>"
+  echo "   $me help | -h              Display this help message."
+  echo "   $me show <gpu>             Shows detailed statistics for <gpu>"
+  echo "   $me status <gpu>           Same as above"
+  echo "   $me power <limit> <gpu>    Sets power limit to <limit> in watts for <gpu>"
+  echo "   $me power reset <gpu>      Resets power limit for <gpu>"
+  echo "   $me recover <gpu>          Attempt to recover a halted or crashed <gpu>"
+  echo "   $me fan enable <gpu>       Enables manual fan speed control for <gpu>"
+  echo "   $me fan disable <gpu>      Disables manual fan speed control for <gpu>"
+  echo "   $me fan <speed> <gpu>      Sets fan speed for <gpu>"
+  echo "   $me fancurve enable <gpu>  Enables fan curve daemon for <gpu>"
+  echo "   $me fancurve disable <gpu> Disables the fancurve daemon for <gpu>"
+  echo "   $me fancurve set [delay] [fancurves] <gpu>"
+  echo "                                    Sets the fan curve and delay for <gpu>"
   echo
-  echo "   GPU0..9 refers to the 0..9th AMD GPUs reported by the amdgpu driver."
+  echo "   <gpu> refers to the number of the GPU reported by the amdgpu driver."
+  echo
+  echo "  The fan curve daemon does not need to be running for manual fan control,"
+  echo "  it only needs to run if you want to define custom fan curves, in which"
+  echo "  case the daemon will read from ~/.amdpwrfan to determine the curves,"
+  echo "  which can be set by manually editing the file or using the fancurve set"
+  echo "  command, which will create the file for you. See README.md for an"
+  echo "  example config, or simply 'use $me fancurve enable' without a"
+  echo "  config and $me will create a default one for you."
+  echo
+  echo "  [fancurves] should be formatted as follows:"
+  echo "  temp:speed for every temperature/speed you want to add"
+  echo "  values between specified values will be interpolated"
+  echo
+  echo "  Example: To set the fan curve to 0% at 25 C, 25% at 40 C, 50% at 50 C"
+  echo "  and 75% at 60 C, updating every 5 seconds for GPU 0, you would use:"
+  echo
+  echo "  sudo $me fancurve set 5 25:0 40:25 50:50 60:75 65:100 0"
   echo
 }
+
+checkbashver
 
 if [[ $# -eq 0 ]] ; then
   usage
@@ -70,11 +112,11 @@ subcommand=$1; shift
 
 #    shift $((OPTIND -1))
 case "$subcommand" in
-  help) 
+  help ) 
 	usage
 	exit 0
   ;;
-  show)
+  status | show )
 	gpu=$2;
 	if [ -z $gpu ] || ! [[ "$gpu" =~ $isnum ]] ; then
 		gpu=0
@@ -391,6 +433,261 @@ case "$subcommand" in
 	fi
 
     ;;
+    _amdpwrfan_start )
+	gpu=$2
+	if [ -z $gpu ] ; then
+		gpu=0
+	fi
+
+	if [ $parent != "amdpwrman" ] ; then
+		log "Error: this command is used internally by amdpwrman and is not meant to be called directly. (${parent})"
+		log "To enable fancurve control, use 'sudo amdpwrman fancurve enable'"
+		exit 1
+	fi
+
+	if [ $myuser != "root" ] ; then 
+		log "Error: root is required to fancurve!"
+		exit 1
+	fi
+
+	log "amdpwrman fancurve daemon loaded .."
+
+	log "Enabling manual fan control for GPU $gpu.."
+
+	amdpwrman fan enable $gpu
+
+	trap 'log amdpwrman fancurve daemon exiting ..;amdpwrman fan disable;exit 0' SIGUSR1
+#	trap 'log received kill signal!' SIGUSR1 # for testing force-kill
+
+	declare -A fancurves
+
+	if [ ! -f ~/.amdpwrfan ] ; then 
+		log "No fan curve file found, creating a default for GPU $gpu at ~/.amdpwrfan"
+		echo "5 25:25 50:50 60:75 70:100 $gpu" > ~/.amdpwrfan
+	fi
+
+	while [ 0 ] ; do
+		# this is where we do our fanmagic
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+		fanspeedpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1`
+		fanspeedpct=$(expr $fanspeedpwm / 255 \* 100)
+
+		temperature=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/temp1_input`
+		temperature=$(expr $temperature / 1000)
+
+#		fanspeedrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_input`
+#		fanspeedrpmfrm=`echo $fanspeedrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+#		fanspeedmaxrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_max`
+#		fanspeedmaxrpmfrm=`echo $fanspeedmaxrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+#		fanspeedminrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_min`
+#		fanspeedminrpmfrm=`echo $fanspeedminrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+#		fanspeedtargetrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/fan1_target`
+#		fanspeedtargetfrm=`echo $fanspeedtargetrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+
+#		pwrusage=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_average`
+#		pwrusagemw=`echo "scale = 2; $pwrusage / 1000" | bc | awk '{printf "%.f\n", $0}'`
+#		pwrusagewatts=`echo "scale = 2; $pwrusage / 1000000" | bc | awk '{printf "%.2f\n", $0}'`
+#		pwrusagemwfrm=`echo $pwrusagemw | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
+
+#		powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_max`
+#		powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/power1_cap_min`
+
+		if (( $fanmode == 2 )) ; then 
+			log "Something has reset fan control to automatic mode - exiting.."
+			exit 1
+		elif (( $fanmode == 1 )) ; then
+			log "Fan mode is still manual - good!"
+
+			log "Reading fancurves from ~/.amdpwrfan .."
+
+			readarray fancurvesfile < ~/.amdpwrfan
+
+			for i in "${!fancurvesfile[@]}"; do 
+				IFS=' ' read -r -a fcsplit <<< ${fancurvesfile[i]}
+
+				for x in "${!fcsplit[@]}"; do 
+					if (( x == 0 )) ; then 
+						fanwait=${fcsplit[x]}
+					else
+						IFS=':' read -r -a fcsplit2 <<< ${fcsplit[x]}
+						if [ -z ${fcsplit2[1]} ] ; then 
+							reqgpu=${fcsplit2[0]}
+						else
+							fancurves_temp[x]=${fcsplit2[0]}
+							fancurves_target[x]=${fcsplit2[1]}
+						fi
+					fi
+				done
+
+				for x in "${!fancurves_temp[@]}"; do 
+					fancurves[$reqgpu.${fancurves_temp[x]}]=${fancurves_target[x]} #fake2d
+				done
+			done
+
+			mygpuentries=0
+			for i in "${!fancurves[@]}"; do 
+				IFS='.' read -r -a isplit <<< $i
+
+				if [[ $gpu == ${isplit[0]} ]] ; then 
+					mygpufound=true
+#					log "For GPU ${isplit[0]} and temperature ${isplit[1]} fan speed target is ${fancurves[$i]}"
+#					log "GPU $gpu current fan speed is $fanspeedpct and temperature is $temperature"
+
+					mygpucurve_temp[mygpuentries]=${isplit[1]}
+					mygpucurve_target[mygpuentries]=${fancurves[$i]}
+
+					(( mygpuentries++ ))
+				fi
+			done
+
+			mygputemplist=""
+#			mygpucurvelist=""
+			if (( mygpuentries == 0 )) ; then 
+				log "While a fan curve file was found, no settings for GPU $gpu were found in the file, so we will add default settings for this GPU."
+				echo "5 25:25 50:50 60:75 70:100 $gpu" >> ~/.amdpwrfan
+			else
+				log "Read $mygpuentries entries for GPU $gpu"
+
+				for i in "${!mygpucurve_temp[@]}"; do 
+					mygputemplist="$mygputemplist ${mygpucurve_temp[$i]}"
+#					mygpucurvelist="$mygpucurvelist ${mygpucurve_temp[$i]}:${mygpucurve_target[$i]}"
+#					log "GPU $gpu Temperature ${mygpucurve_temp[$i]} : ${mygpucurve_target[$i]}%"
+				done
+
+				nearesttarget=`echo $mygputemplist | awk -v VAL=$temperature -v RS=" " '{
+				        D=(VAL - $1) * (VAL - $1);
+
+				        if((VAL<=$1)&&(((!SETA) || (D < DIFFA))))
+				        {
+				                DIFFA=D;
+				                XA=$1;
+				                SETA=1;
+				        }
+
+				        if((VAL>=$1)&&(((!SETB) || (D < DIFFB))))
+				        {
+				                DIFFB=D;
+				                XB=$1;
+			        	        SETB=1;
+				        }
+				}
+
+				END {   if(!SETA)       printf("%s", XB);
+				        else            printf("%s", XA);
+
+#				        if(!SETB)       print "No lesser bound";
+#				        else            printf("Closest lesser bound was %s\n", XB);   
+					}'`
+
+
+				for i in "${!mygpucurve_temp[@]}"; do 
+					if (( ${mygpucurve_temp[i]} == $nearesttarget )) ; then
+						log "Setting GPU${gpu} fan speed to ${mygpucurve_target[$i]}%"
+						log "Current Temp: $temperature deg C - Nearest Target: $nearesttarget deg C @ ${mygpucurve_target[$i]}%"
+						amdpwrman fan ${mygpucurve_target[i]} $gpu
+					fi
+				done
+			fi
+
+		fi
+
+		sleep $fanwait
+	done
+    ;;
+    fancurve )
+	gpu=$2
+	if [ -z $gpu ] ; then
+		gpu=0
+	fi
+
+	cmd=$1
+#	if [ -z $1 ] || (( $1 < 0  || $1 > 100 )) || ! [[ "$1" =~ $isnum ]] ; then 
+	    if [ "$cmd" != "enable" ] && [ "$cmd" != "disable" ] ; then 
+		echo "Error: Invalid fancurve command, you must specify a curve (see help) or 'enable' or 'disable'"
+		usage
+		exit 1
+	    fi
+#	fi
+
+	if [ ! -d /sys/class/drm/card${gpu} ] ; then
+		echo "Error: Unable to find GPU${gpu}"
+		echo ; exit 1
+	fi
+
+	if [ $myuser != "root" ] ; then 
+		echo "Error: root is required to modify fan speeds."
+		echo ; exit 1
+	fi
+
+	if [ $1 == 'enable' ] ; then 
+		pwrmancnt=`pgrep amdpwrman | wc -l`; (( pwrmancnt-- ))
+		if (( pwrmancnt == 2 )) ; then 
+			echo "Error: amdpwrman fan daemon is already running, fancurve control should be enabled already"
+			echo ; exit 1
+		fi
+		if (( pwrmancnt == 1 )) ; then 
+			(amdpwrman _amdpwrfan_start $gpu > ~/.amdpwrfan.log)&
+#			(amdpwrman _amdpwrfan_start $gpu)&
+			echo "Started amdpwrman fan daemon ($!)"
+			echo "Log file is at ~/.amdpwrfan.log"
+			sleep $longwait
+			echo ; exit 0
+		fi
+	fi
+
+	if [ $1 == 'disable' ] ; then 
+		pwrmanpids=( $(pgrep amdpwrman) )
+		pwrmancnt=${#pwrmanpids[@]}
+		pwrfancnt=0
+
+		for i in "${!pwrmanpids[@]}"; do
+			if (( pwrmanpids[i] != $$ )) ; then # kill all pids that arent me..?
+				(( pwrfancnt++ ))
+				kill -SIGUSR1 ${pwrmanpids[i]}
+				echo "Sent signal to kill fancurve daemon.."
+				sleep $longwait
+
+				# check if killed and fan control set to auto or manual
+				dblpwrmanpids=( $(pgrep amdpwrman) )
+				dblpwrmancnt=${#pwrmanpids[@]}
+				dblpwrfancnt=0
+
+				for i in "${!dblpwrmanpids[@]}"; do
+					if (( dblpwrmanpids[i] != $$ )) ; then 
+						(( dblpwrfancnt++ ))
+						echo "..was not stopped nicely..forcing it to stop.."
+						kill ${pwrmanpids[i]}
+						echo "..attempting to force fans to full speed in manual mode.."
+						amdpwrman fan enable $gpu
+						amdpwrman fan 100 $gpu
+					fi
+				done
+
+				if (( dblpwrfancnt == 0 )) ; then 
+					sleep $longwait
+					fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon0/pwm1_enable`
+
+					if (( $fanmode == 2 )) ; then 
+						echo "Daemon appears to have stopped correctly - fan speeds have been reset to default automatic mode."
+						echo ; exit 0
+					else
+						echo "Daemon seems to have been killed but did not set the fans back to auto - attempting to force fans to full speed in manual mode.."
+						amdpwrman fan enable $gpu
+						amdpwrman fan 100 $gpu
+						echo ; exit 1
+					fi
+
+				fi
+			fi
+		done
+
+		if (( pwrfancnt == 0 )) ; then 
+			echo "Error: amdpwrman fan daemon was not already running, fancurve control was not enabled"
+			echo ; exit 1
+		fi
+	fi
+    ;;
     fan )
 	gpu=$2
 	if [ -z $gpu ] ; then
@@ -398,6 +695,7 @@ case "$subcommand" in
 	fi
 
 	cmd=$1
+	#TODO: we should tolerate if they suffix with %
 	if [ -z $1 ] || (( $1 < 0  || $1 > 100 )) || ! [[ "$1" =~ $isnum ]] ; then 
 	    if [ "$cmd" != "enable" ] && [ "$cmd" != "disable" ] ; then 
 		echo "Error: You must specify a fan speed in percent (0 - 100)"
