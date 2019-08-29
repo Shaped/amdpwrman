@@ -17,25 +17,25 @@
   This script was created because I needed a simple way to manage my AMD mining GPUs
   from the console.
   
+    Usage:
 
-Usage:
-   If <gpu> is ommitted from any command, GPU0 is used.
+    If <gpu> is ommitted from any command, GPU0 is used.
 
-   amdpwrman help | -h              Display this help message.
-   amdpwrman show <gpu>             Shows detailed statistics for <gpu>
-   amdpwrman status <gpu>           Same as above
-   amdpwrman power <limit> <gpu>    Sets power limit to <limit> in watts for <gpu>
-   amdpwrman power reset <gpu>      Resets power limit for <gpu>
-   amdpwrman recover <gpu>          Attempt to recover a halted or crashed <gpu>
-   amdpwrman fan enable <gpu>       Enables manual fan speed control for <gpu>
-   amdpwrman fan disable <gpu>      Disables manual fan speed control for <gpu>
-   amdpwrman fan <speed> <gpu>      Sets fan speed for <gpu>
-   amdpwrman fancurve enable <gpu>  Enables fan curve daemon for <gpu>
-   amdpwrman fancurve disable <gpu> Disables the fancurve daemon for <gpu>
-   amdpwrman fancurve set [delay] [fancurves] <gpu>
-                                    Sets the fan curve and delay for <gpu>
+    amdpwrman help | -h              Display this help message.
+    amdpwrman show <gpu>             Shows detailed statistics for <gpu>
+    amdpwrman status <gpu>           Same as above
+    amdpwrman power <limit> <gpu>    Sets power limit to <limit> in watts for <gpu>
+    amdpwrman power reset <gpu>      Resets power limit for <gpu>
+    amdpwrman recover <gpu>          Attempt to recover a halted or crashed <gpu>
+    amdpwrman fan enable <gpu>       Enables manual fan speed control for <gpu>
+    amdpwrman fan disable <gpu>      Disables manual fan speed control for <gpu>
+    amdpwrman fan <speed> <gpu>      Sets fan speed for <gpu>
+    amdpwrman fancurve enable <gpu>  Enables fan curve daemon for <gpu>
+    amdpwrman fancurve disable <gpu> Disables the fancurve daemon for <gpu>
+    amdpwrman fancurve set [delay] [fancurves] <gpu>
+                                     Sets the fan curve and delay for <gpu>
 
-   <gpu> refers to the number of the GPU reported by the amdgpu driver.
+    <gpu> refers to the number of the GPU reported by the amdgpu driver.
 
     The fan curve daemon does not need to be running for manual fan control,
     it only needs to run if you want to define custom fan curves, in which
