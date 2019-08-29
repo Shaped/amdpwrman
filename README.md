@@ -17,27 +17,44 @@
   This script was created because I needed a simple way to manage my AMD mining GPUs
   from the console.
   
-  Usage:
 
-      If <gpu> is ommitted from any command, GPU0 is used. Note that GPU0 only
-      refers to the first AMD GPU reported by the amdgpu driver.
+Usage:
+   If <gpu> is ommitted from any command, GPU0 is used.
 
-      amdpwrman help | -h            Display this help message.
-      amdpwrman show <gpu>           Shows detailed statistics for <gpu>
-      amdpwrman power <limit> <gpu>  Sets power limit to <limit> in watts for <gpu>
-      amdpwrman power reset <gpu>    Resets power limit for <gpu>
-      amdpwrman fan enable <gpu>     Enables manual fan speed control for <gpu>
-      amdpwrman fan disable <gpu>    Disables manual fan speed control for <gpu>
-      amdpwrman fan <speed> <gpu>    Sets fan speed for <gpu>
-      amdpwrman recover <gpu>        Attempt to recover a halted or crashed <gpu>
+   amdpwrman help | -h              Display this help message.
+   amdpwrman show <gpu>             Shows detailed statistics for <gpu>
+   amdpwrman status <gpu>           Same as above
+   amdpwrman power <limit> <gpu>    Sets power limit to <limit> in watts for <gpu>
+   amdpwrman power reset <gpu>      Resets power limit for <gpu>
+   amdpwrman recover <gpu>          Attempt to recover a halted or crashed <gpu>
+   amdpwrman fan enable <gpu>       Enables manual fan speed control for <gpu>
+   amdpwrman fan disable <gpu>      Disables manual fan speed control for <gpu>
+   amdpwrman fan <speed> <gpu>      Sets fan speed for <gpu>
+   amdpwrman fancurve enable <gpu>  Enables fan curve daemon for <gpu>
+   amdpwrman fancurve disable <gpu> Disables the fancurve daemon for <gpu>
+   amdpwrman fancurve set [delay] [fancurves] <gpu>
+                                    Sets the fan curve and delay for <gpu>
 
-      GPU0..9 refers to the 0..9th AMD GPUs reported by the amdgpu driver.
+   <gpu> refers to the number of the GPU reported by the amdgpu driver.
 
-   NOTE: GPU index numbers are in order reported by the amdgpu driver, so GPU0
-   will always be the first AMD GPU regardless of what other vendor's adapters
-   are present in the system.
+    The fan curve daemon does not need to be running for manual fan control,
+    it only needs to run if you want to define custom fan curves, in which
+    case the daemon will read from ~/.amdpwrfan to determine the curves,
+    which can be set by manually editing the file or using the fancurve set
+    command, which will create the file for you. See README.md for an
+    example config, or simply 'use amdpwrman fancurve enable' without a
+    config and amdpwrman will create a default one for you.
 
-  Examples:
+    [fancurves] should be formatted as follows:
+    temp:speed for every temperature/speed you want to add
+    values between specified values will be interpolated
+
+    Example: To set the fan curve to 0% at 25 C, 25% at 40 C, 50% at 50 C
+    and 75% at 60 C, updating every 5 seconds for GPU 0, you would use:
+
+    sudo amdpwrman fancurve set 5 25:0 40:25 50:50 60:75 65:100 0
+
+    Examples:
 
       #$ ./amdpwrman show		Show stats for GPU0 (TODO: show stats for all gpus)
       #$ ./amdpwrman power 100		Sets power limit to 100W for GPU0

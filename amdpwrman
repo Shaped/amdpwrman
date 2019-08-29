@@ -5,7 +5,7 @@
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 mycmd="$0 $1 $2 $3 $4"
 myuser=`whoami`
-version="0.03a"
+version="0.04a"
 isnum='^[0-9]+$'
 wait=0.5
 longwait=5
