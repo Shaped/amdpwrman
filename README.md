@@ -32,8 +32,6 @@
     amdpwrman fan <speed> <gpu>      Sets fan speed for <gpu>
     amdpwrman fancurve enable <gpu>  Enables fan curve daemon for <gpu>
     amdpwrman fancurve disable <gpu> Disables the fancurve daemon for <gpu>
-    amdpwrman fancurve set [delay] [fancurves] <gpu>
-                                     Sets the fan curve and delay for <gpu>
 
     <gpu> refers to the number of the GPU reported by the amdgpu driver.
 
