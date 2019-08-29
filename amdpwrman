@@ -63,8 +63,8 @@ usage () {
   echo "   $me fan <speed> <gpu>      Sets fan speed for <gpu>"
   echo "   $me fancurve enable <gpu>  Enables fan curve daemon for <gpu>"
   echo "   $me fancurve disable <gpu> Disables the fancurve daemon for <gpu>"
-  echo "   $me fancurve set [delay] [fancurves] <gpu>"
-  echo "                                    Sets the fan curve and delay for <gpu>"
+#  echo "   $me fancurve set [delay] [fancurves] <gpu>"
+#  echo "                                    Sets the fan curve and delay for <gpu>"
   echo
   echo "   <gpu> refers to the number of the GPU reported by the amdgpu driver."
   echo
