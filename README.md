@@ -1,4 +1,4 @@
-  amdpwrman 0.01a        (C) 2020 Jai B. (Shaped Technologies)        MIT License
+  amdpwrman 0.04a        (C) 2020 Jai B. (Shaped Technologies)        MIT License
 
   amdpwrman shows statistics and manipulates power limit settings for AMD GPUs
   on Linux through the sysfs interface provided by the amdgpu driver. This script
