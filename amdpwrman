@@ -117,10 +117,12 @@ case "$subcommand" in
 	exit 0
   ;;
   status | show )
-	gpu=$2;
+	gpu=$1;
 	if [ -z $gpu ] || ! [[ "$gpu" =~ $isnum ]] ; then
 		gpu=0
 	fi
+
+	echo status for GPU${gpu}
 
 	if [ ! -d /sys/class/drm/card${gpu} ] ; then
 		echo "Error: Unable to find GPU${gpu}"
@@ -159,7 +161,9 @@ case "$subcommand" in
 	pcilinkwidth=`cat /sys/class/drm/card${gpu}/device/current_link_width`
 	maxpcilinkspeed=`cat /sys/class/drm/card${gpu}/device/max_link_speed`
 	maxpcilinkwidth=`cat /sys/class/drm/card${gpu}/device/max_link_width`
-	pciaddr=`ls /sys/class/drm/card0/device/driver | sort -n | head -1`
+	
+	#not working
+	pciaddr=`ls /sys/class/drm/card${gpu}/device/driver | sort -n | head -1`
 
 	pcideviceid=`cat /sys/class/drm/card${gpu}/device/device`
 	pcivendorid=`cat /sys/class/drm/card${gpu}/device/vendor`
