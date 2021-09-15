@@ -812,7 +812,7 @@ case "$subcommand" in
 
     ;;
     recover )
-	gpu=$2
+	gpu=$1
 	if [ -z $gpu ] ; then
 		gpu=0
 	fi
