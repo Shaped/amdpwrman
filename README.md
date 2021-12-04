@@ -1,4 +1,4 @@
-  amdpwrman 0.04a        (C) 2020 Jai B. (Shaped Technologies)        MIT License
+  amdpwrman 0.05a        (C) 2020 Jai B. (Shaped Technologies)        MIT License
 
   amdpwrman shows statistics and manipulates power limit settings for AMD GPUs
   on Linux through the sysfs interface provided by the amdgpu driver. This script
@@ -83,9 +83,18 @@
 
       - support multiple GPUs at once, eg. 'amdpwrman show all'.
       - change 'show' without a GPU specifier to show all GPUs once multigpu support is complete.
+      - decide how to implement fan curve daemon; should we use node? If so, should the whole thing be node? If not, how bad is it really to run a shell script as a daemon?
+        - the no-dependencies nature of using shell script is great for this application. however, shell scripting isn't the cleanest way to code and definitely has limitations.
+        - many distros, especially LTS, ship a realy old version of node. not too hard to work around but still a pain.
+        - can we compile a sort of node binary? bytecode/opcodes? packed interpreter/vm? I suppose this could be an option with PHP bytecode/opcodes too, while php would normally be avoided for the same dependency reasons. 
       - fan curve control has started to be implemented
       - fan curve control currently only selects the next highest fan setting and uses that
       - fan curve control needs to interopolate fan speeds between settings instead of simply going to the next highest
       - fan curve control needs to be tweaked to support multiple GPUs at once - while it's been structured for multilpe GPUs from the get-go, it currently only will allow one instance to run. simply allowing multiple instances would allow fan control of multiple GPUs but I feel a single instance for all GPUs is best
       - fan curve control format is: delay temp:fanspeed ... temp:fanspeed gpu .. if we are managing all GPUs in one instance, then we need to either have the same delay for all GPUs, which means another way of setting it instead of it simply being the first variable in the list OR we need to actually do some more fun stuff so that it updates each GPU based off it's waittime
       - fan curve control should have options for linear and log scaling/interop
+
+  CHANGELOG:
+
+     - 0.05a
+       - pimpleemented a fix for issue #1
