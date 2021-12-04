@@ -129,30 +129,32 @@ case "$subcommand" in
 		echo ; exit 1
 	fi
 
-	powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap`
+	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
+
+	powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap`
 	watts=$(expr $powercap / 1000000)
 
-	fanspeedmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+	fanspeedmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
-	fanspeedpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1`
+	fanspeedpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1`
 	fanspeedpct=$(expr $fanspeedpwm / 255 \* 100)
 
-	fanspeedrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_input`
+	fanspeedrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_input`
 	fanspeedrpmfrm=`echo $fanspeedrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
-	fanspeedmaxrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_max`
+	fanspeedmaxrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_max`
 	fanspeedmaxrpmfrm=`echo $fanspeedmaxrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
-	fanspeedminrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_min`
+	fanspeedminrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_min`
 	fanspeedminrpmfrm=`echo $fanspeedminrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
-	fanspeedtargetrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_target`
+	fanspeedtargetrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_target`
 	fanspeedtargetfrm=`echo $fanspeedtargetrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
 
-	pwrusage=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_average`
+	pwrusage=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_average`
 	pwrusagemw=`echo "scale = 2; $pwrusage / 1000" | bc | awk '{printf "%.f\n", $0}'`
 	pwrusagewatts=`echo "scale = 2; $pwrusage / 1000000" | bc | awk '{printf "%.2f\n", $0}'`
 	pwrusagemwfrm=`echo $pwrusagemw | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
 
-	powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap_max`
-	powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap_min`
+	powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap_max`
+	powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap_min`
 
 	powercapmaxwatts=$(expr $powercapmax / 1000000)
 	powercapminwatts=$(expr $powercapmin / 1000000)
@@ -201,23 +203,23 @@ case "$subcommand" in
 		pcisubvendorname="Unknown (Coming Soon)"
 	fi
 
-	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/in0_input`
+	vddgfx=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/in0_input`
 
 	# temperature isnt reported with decimals or we would use bc and keep them
-	temperature=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/temp1_input`
+	temperature=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/temp1_input`
 	temperature=$(expr $temperature / 1000)
 	tempinF=$(echo "scale=2;((9/5) * $temperature) + 32" |bc)
 
 	gpuusage=`cat /sys/class/drm/card${gpu}/device/gpu_busy_percent`
 	vramusage=`cat /sys/class/drm/card${gpu}/device/mem_busy_percent`
 
-	freq1=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/freq1_input`
+	freq1=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/freq1_input`
 	freq1mhz=$(echo "scale=2; $freq1 / 1000000" | bc | awk '{printf "%.2f\n", $0}')
-	freq1name=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/freq1_label`
+	freq1name=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/freq1_label`
 
-	freq2=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/freq2_input`
+	freq2=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/freq2_input`
 	freq2mhz=$(echo "scale=2; $freq2 / 1000000" | bc | awk '{printf "%.2f\n", $0}')
-	freq2name=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/freq2_label`
+	freq2name=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/freq2_label`
 
 	if [ $freq1name == "sclk" ] ; then 
 		freq1friendlyname="GPU clock"
@@ -351,11 +353,11 @@ case "$subcommand" in
 			fi
 
 			echo -n "Attempting to reset power cap to default .."
-			oldpowercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap`
+			oldpowercap=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap`
 			sleep $wait ; echo -n ".."
-			echo 0 > /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap
+			echo 0 > /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap
 			sleep $wait ; echo -n ".."
-			powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap`
+			powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap`
 			sleep $wait ; echo -n ".."
 
 			oldpowercapwatts=$(expr $oldpowercap / 1000000)
@@ -376,9 +378,9 @@ case "$subcommand" in
 		fi
 	fi
 
-	oldpowercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap`
-	powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap_max`
-	powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap_min`
+	oldpowercap=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap`
+	powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap_max`
+	powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap_min`
 
 	oldpowercapwatts=$(expr $oldpowercap / 1000000)
 	powercapmaxwatts=$(expr $powercapmax / 1000000)
@@ -405,7 +407,7 @@ case "$subcommand" in
 
 	echo "Setting power cap for GPU${gpu} to ${1} watts"
 
-	echo $newpowercap > /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap
+	echo $newpowercap > /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap
 
 	sleep $wait
 
@@ -415,7 +417,7 @@ case "$subcommand" in
 
 	echo -n ".."
 
-	powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap`
+	powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap`
 	powercapwatts=$(expr $powercap / 1000000)
 
 	if [ $newpowercap -ne $powercap ] ; then 
@@ -472,30 +474,30 @@ case "$subcommand" in
 
 	while [ 0 ] ; do
 		# this is where we do our fanmagic
-		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
-		fanspeedpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1`
+		fanspeedpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1`
 		fanspeedpct=$(expr $fanspeedpwm / 255 \* 100)
 
-		temperature=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/temp1_input`
+		temperature=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/temp1_input`
 		temperature=$(expr $temperature / 1000)
 
-#		fanspeedrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_input`
+#		fanspeedrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_input`
 #		fanspeedrpmfrm=`echo $fanspeedrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
-#		fanspeedmaxrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_max`
+#		fanspeedmaxrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_max`
 #		fanspeedmaxrpmfrm=`echo $fanspeedmaxrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
-#		fanspeedminrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_min`
+#		fanspeedminrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_min`
 #		fanspeedminrpmfrm=`echo $fanspeedminrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
-#		fanspeedtargetrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/fan1_target`
+#		fanspeedtargetrpm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/fan1_target`
 #		fanspeedtargetfrm=`echo $fanspeedtargetrpm | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
 
-#		pwrusage=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_average`
+#		pwrusage=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_average`
 #		pwrusagemw=`echo "scale = 2; $pwrusage / 1000" | bc | awk '{printf "%.f\n", $0}'`
 #		pwrusagewatts=`echo "scale = 2; $pwrusage / 1000000" | bc | awk '{printf "%.2f\n", $0}'`
 #		pwrusagemwfrm=`echo $pwrusagemw | sed ':a;s/\B[0-9]\{3\}\>/,&/;ta'`
 
-#		powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap_max`
-#		powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/power1_cap_min`
+#		powercapmax=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap_max`
+#		powercapmin=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap_min`
 
 		if (( $fanmode == 2 )) ; then 
 			log "Something has reset fan control to automatic mode - exiting.."
@@ -670,7 +672,7 @@ case "$subcommand" in
 
 				if (( dblpwrfancnt == 0 )) ; then 
 					sleep $longwait
-					fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+					fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
 					if (( $fanmode == 2 )) ; then 
 						echo "Daemon appears to have stopped correctly - fan speeds have been reset to default automatic mode."
@@ -719,7 +721,7 @@ case "$subcommand" in
 	fi
 
 	if [ $1 == 'enable' ] ; then 
-		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
 		if (( $fanmode == 1 )) ; then 
 			echo "Error: Manual control is already enabled."
@@ -730,11 +732,11 @@ case "$subcommand" in
 
 		sleep $wait
 
-		echo 1 > /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable
+		echo 1 > /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable
 
 		sleep $wait
 
-		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
 		if (( $fanmode == 1 )) ; then 
 			echo ".. OK"
@@ -746,7 +748,7 @@ case "$subcommand" in
 	fi
 
 	if [ $1 == 'disable' ] ; then 
-		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
 		if (( $fanmode == 2 )) ; then 
 			echo "Error: Manual control is already disabled."
@@ -756,11 +758,11 @@ case "$subcommand" in
 		echo -n  "Disabling manual fan speed control for GPU${gpu} .."
 		sleep $wait
 
-		echo 2 > /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable
+		echo 2 > /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable
 
 		sleep $wait
 
-		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+		fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
 		if (( $fanmode == 2 )) ; then 
 			echo ".. OK"
@@ -771,7 +773,7 @@ case "$subcommand" in
 		fi
 	fi
 
-	fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1_enable`
+	fanmode=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1_enable`
 
 	if (( $fanmode != 1 )) ; then 
 		echo "Error: Fan mode is not set to manual."
@@ -779,7 +781,7 @@ case "$subcommand" in
 		echo ; exit 1
 	else
 		newpwm=$(expr $1 \* 255 / 100)
-		oldpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1`
+		oldpwm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1`
 
 		oldpwmpct=$(expr $oldpwm \* 100 / 255)
 
@@ -790,11 +792,11 @@ case "$subcommand" in
 		sleep $wait
 
 		echo -n ".."
-		echo $newpwm > /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1
+		echo $newpwm > /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1
 
 		sleep $wait
 
-		pwm=`cat /sys/class/drm/card${gpu}/device/hwmon/hwmon${gpu}/pwm1`
+		pwm=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/pwm1`
 
 		if (( $pwm != $oldpwm )) ; then 
 			echo ".. FAN SPEED CHANGED"
