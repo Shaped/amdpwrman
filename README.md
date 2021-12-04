@@ -3,7 +3,9 @@
   amdpwrman shows statistics and manipulates power limit settings for AMD GPUs
   on Linux through the sysfs interface provided by the amdgpu driver. This script
   was designed to be very simple to use from the shell, requiring no external
-  configuration.
+  dependencies or configuration, though a future version may be based on NodeJS
+  or be a binary application - the goal will still be to be as light and easy
+  as possbile.
   
   All values are reported by the sysfs interface provided by the amdgpu driver,
   sometimes these values may not be perfect, for example on an RX570, the max
