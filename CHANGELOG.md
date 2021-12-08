@@ -4,3 +4,4 @@
 0.04a started implementing fancurve control. this is in alpha.
 0.04b just a fix for multiple GPUs
 0.05a implemented a fix for Issue #1
+0.05b implmented fix for Issue #2 that arose from the half-assed fix to issue #1

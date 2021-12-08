@@ -5,7 +5,7 @@
 me="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 mycmd="$0 $1 $2 $3 $4"
 myuser=`whoami`
-version="0.04a"
+version="0.05b"
 isnum='^[0-9]+$'
 wait=0.5
 longwait=5
@@ -124,12 +124,12 @@ case "$subcommand" in
 
 	echo status for GPU${gpu}
 
+	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
+
 	if [ ! -d /sys/class/drm/card${gpu} ] ; then
 		echo "Error: Unable to find GPU${gpu}"
 		echo ; exit 1
 	fi
-
-	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
 
 	powercap=`cat /sys/class/drm/card${gpu}/device/hwmon/${hwmon}/power1_cap`
 	watts=$(expr $powercap / 1000000)
@@ -331,6 +331,7 @@ case "$subcommand" in
     ;;
     power )
 	gpu=$2
+	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
 	if [ -z $gpu ] || ! [[ "$gpu" =~ $isnum ]] ; then
 		gpu=0
 	fi
@@ -441,6 +442,8 @@ case "$subcommand" in
     ;;
     _amdpwrfan_start )
 	gpu=$2
+	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
+
 	if [ -z $gpu ] ; then
 		gpu=0
 	fi
@@ -603,6 +606,7 @@ case "$subcommand" in
     ;;
     fancurve )
 	gpu=$2
+	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
 	if [ -z $gpu ] ; then
 		gpu=0
 	fi
@@ -696,6 +700,7 @@ case "$subcommand" in
     ;;
     fan )
 	gpu=$2
+	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
 	if [ -z $gpu ] ; then
 		gpu=0
 	fi
@@ -815,6 +820,7 @@ case "$subcommand" in
     ;;
     recover )
 	gpu=$1
+	hwmon=`ls /sys/class/drm/card${gpu}/device/hwmon/`
 	if [ -z $gpu ] ; then
 		gpu=0
 	fi
