@@ -1,3 +1,10 @@
+# Soon to be deprecated!!
+*amdpwrman* is now being replaced by a newer app, *gpumgr*. Currently, *gpumgr* only implements the *show* command from *amdpwrman* but will soon support all it's features, have a properly functioning fan curve daemon, a web interface and ultimately add support for different GPU vendors like nvidia.
+
+Feel free to use *amdpwrman* in the meantime but definitely check out the new project as that's where my efforts will be going.
+
+## amdpwrman
+
   amdpwrman 0.05a        (C) 2020 Jai B. (Shaped Technologies)        MIT License
 
   amdpwrman shows statistics and manipulates power limit settings for AMD GPUs
